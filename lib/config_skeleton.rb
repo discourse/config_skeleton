@@ -260,7 +260,7 @@ class ConfigSkeleton < ServiceSkeleton
   def watch(*files)
     files.each do |f|
       if File.directory?(f)
-        notifier.watch(f, :recursive, :create, :modify, :delete, :move) { |ev| logger.info("#{logloc} watcher") { "detected #{ev.flags.join(", ")} on #{ev.watcher.path}/#{ev.file}; regenerating config" } }
+        notifier.watch(f, :recursive, :create, :modify, :delete, :move) { |ev| logger.info("#{logloc} watcher") { "detected #{ev.flags.join(", ")} on #{ev.watcher.path}/#{ev.name}; regenerating config" } }
       else
         notifier.watch(f, :close_write) { |ev| logger.info("#{logloc} watcher") { "detected #{ev.flags.join(", ")} on #{ev.watcher.path}; regenerating config" } }
       end
