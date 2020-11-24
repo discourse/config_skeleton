@@ -41,7 +41,7 @@ conduct](CODE_OF_CONDUCT.md).
 Unless otherwise stated, everything in this repo is covered by the following
 copyright notice:
 
-    Copyright (C) 2020  Civilized Discourse Construction Kit, Inc.
+    Copyright (C) 2020 Civilized Discourse Construction Kit, Inc.
 
     This program is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License version 3, as
