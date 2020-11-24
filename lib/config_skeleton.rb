@@ -142,6 +142,18 @@ class ConfigSkeleton < ServiceSkeleton
   # If you get this, someone didn't read the documentation.
   class NotImplementedError < Error; end
 
+  # It is useful for consumers to manually request a config regen. An instance
+  # of this class is made via the regen_notifier method.
+  class ConfigRegenNotifier
+    def initialize(io_write)
+      @io_write = io_write
+    end
+
+    def trigger_regen
+      @io_write << "."
+    end
+  end
+
   # Declare a file watch on all instances of the config generator.
   #
   # When you're looking to watch a file whose path is well-known and never-changing, you
@@ -195,12 +207,11 @@ class ConfigSkeleton < ServiceSkeleton
   # regeneration with a forced reload; a similar mechanism is used for
   # shutdown but in that case writes are managed internally.
   #
-  # Usage: config.reload_trigger.write(".") . It does not matter what
-  # is written, we are only detecting that something was written.
+  # Usage: config.regen_notifier.trigger_regen
   #
   # @return [IO]
-  def regen_trigger
-    @trigger_regen_w
+  def regen_notifier
+    @regen_notifier ||= ConfigRegenNotifier.new(@trigger_regen_w)
   end
 
   # Set the config generator running.
