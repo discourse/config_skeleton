@@ -54,8 +54,9 @@ RSpec.describe ConfigSkeleton do
   it "watches for a regen trigger write and regenerate the config" do
     expect(subject).to receive(:regenerate_config).with(force_reload: true).twice.and_call_original
     expect(subject).to receive(:regenerate_config).once.and_call_original
-    Thread.new { sleep 0.5; subject.reload_trigger.write(".") }
-    Thread.new { sleep 1.5; subject.reload_trigger.write(".") }
+    trig = subject.regen_trigger
+    Thread.new { sleep 0.5; trig.write(".") }
+    Thread.new { sleep 1.5; trig.write(".") }
     Thread.new { sleep 2.5; subject.shutdown }
     subject.run
   end

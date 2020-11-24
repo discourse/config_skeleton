@@ -199,7 +199,7 @@ class ConfigSkeleton < ServiceSkeleton
   # is written, we are only detecting that something was written.
   #
   # @return [IO]
-  def reload_trigger
+  def regen_trigger
     @trigger_regen_w
   end
 
@@ -235,9 +235,11 @@ class ConfigSkeleton < ServiceSkeleton
           logger.debug(logloc) { "triggered by termination pipe" }
           break
         elsif ios.first.include?(@trigger_regen_r)
-          logger.debug(logloc) { "triggered by regen pipe" }
-          regenerate_config(force_reload: true)
-          initialize_trigger_pipe
+          # check if anything was written, to exclude empty strings
+          if @trigger_regen_r.read_nonblock(1)
+            logger.debug(logloc) { "triggered by regen pipe" }
+            regenerate_config(force_reload: true)
+          end
         else
           logger.error(logloc) { "Mysterious return from select: #{ios.inspect}" }
         end
@@ -299,12 +301,6 @@ class ConfigSkeleton < ServiceSkeleton
   # @return [void]
   #
   def initialize_trigger_pipe
-    if @trigger_regen_r
-      @trigger_regen_r.close
-    end
-    if @trigger_regen_w
-      @trigger_regen_w.close
-    end
     @trigger_regen_r, @trigger_regen_w = IO.pipe
   end
 
