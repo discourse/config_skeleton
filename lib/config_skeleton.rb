@@ -209,7 +209,7 @@ class ConfigSkeleton < ServiceSkeleton
   #
   # Usage: config.regen_notifier.trigger_regen
   #
-  # @return [IO]
+  # @return [ConfigRegenNotifier]
   def regen_notifier
     @regen_notifier ||= ConfigRegenNotifier.new(@trigger_regen_w)
   end
