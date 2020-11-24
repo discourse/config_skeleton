@@ -142,6 +142,18 @@ class ConfigSkeleton < ServiceSkeleton
   # If you get this, someone didn't read the documentation.
   class NotImplementedError < Error; end
 
+  # It is useful for consumers to manually request a config regen. An instance
+  # of this class is made via the regen_notifier method.
+  class ConfigRegenNotifier
+    def initialize(io_write)
+      @io_write = io_write
+    end
+
+    def trigger_regen
+      @io_write << "."
+    end
+  end
+
   # Declare a file watch on all instances of the config generator.
   #
   # When you're looking to watch a file whose path is well-known and never-changing, you
@@ -188,6 +200,18 @@ class ConfigSkeleton < ServiceSkeleton
     end
 
     initialize_config_skeleton_metrics
+    @trigger_regen_r, @trigger_regen_w = IO.pipe
+  end
+
+  # Expose the write pipe which can be written to to trigger a config
+  # regeneration with a forced reload; a similar mechanism is used for
+  # shutdown but in that case writes are managed internally.
+  #
+  # Usage: config.regen_notifier.trigger_regen
+  #
+  # @return [ConfigRegenNotifier]
+  def regen_notifier
+    @regen_notifier ||= ConfigRegenNotifier.new(@trigger_regen_w)
   end
 
   # Set the config generator running.
@@ -209,7 +233,11 @@ class ConfigSkeleton < ServiceSkeleton
     @terminate_r, @terminate_w = IO.pipe
 
     loop do
-      if ios = IO.select([notifier.to_io, @terminate_r], [], [], sleep_duration.tap { |d| logger.debug(logloc) { "Sleeping for #{d} seconds" } })
+      if ios = IO.select(
+          [notifier.to_io, @terminate_r, @trigger_regen_r],
+          [], [],
+          sleep_duration.tap { |d| logger.debug(logloc) { "Sleeping for #{d} seconds" } }
+      )
         if ios.first.include?(notifier.to_io)
           logger.debug(logloc) { "inotify triggered" }
           notifier.process
@@ -217,6 +245,14 @@ class ConfigSkeleton < ServiceSkeleton
         elsif ios.first.include?(@terminate_r)
           logger.debug(logloc) { "triggered by termination pipe" }
           break
+        elsif ios.first.include?(@trigger_regen_r)
+          # we want to wait until everything in the backlog is read
+          # before proceeding so we don't run out of buffer memory
+          # for the pipe
+          while @trigger_regen_r.read_nonblock(20, nil, exception: false) != :wait_readable; end
+
+          logger.debug(logloc) { "triggered by regen pipe" }
+          regenerate_config(force_reload: true)
         else
           logger.error(logloc) { "Mysterious return from select: #{ios.inspect}" }
         end
