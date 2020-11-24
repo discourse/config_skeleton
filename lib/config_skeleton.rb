@@ -188,7 +188,7 @@ class ConfigSkeleton < ServiceSkeleton
     end
 
     initialize_config_skeleton_metrics
-    initialize_trigger_pipe
+    @trigger_regen_r, @trigger_regen_w = IO.pipe
   end
 
   # Expose the write pipe which can be written to to trigger a config
@@ -291,18 +291,6 @@ class ConfigSkeleton < ServiceSkeleton
   end
 
   private
-
-  # Sets up the read/write IO pipe for the reload trigger.
-  # If the pipe already exists, close it and create a new
-  # one, otherwise IO.select triggers instantly after the
-  # first write, which will lead to a huge amount of config
-  # regens.
-  #
-  # @return [void]
-  #
-  def initialize_trigger_pipe
-    @trigger_regen_r, @trigger_regen_w = IO.pipe
-  end
 
   # Register metrics in the ServiceSkeleton metrics registry
   #
