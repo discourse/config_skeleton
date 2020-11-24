@@ -18,9 +18,6 @@ class Bundler::GemHelper
 end
 
 Bundler::GemHelper.install_tasks
-task :release do
-  sh "git release"
-end
 
 task :rubocop do
   sh "rubocop"

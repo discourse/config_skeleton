@@ -1,14 +1,7 @@
-begin
-  require 'git-version-bump'
-rescue LoadError
-  nil
-end
-
 Gem::Specification.new do |s|
   s.name = "config_skeleton"
 
-  s.version = GVB.version rescue "0.0.0.1.NOGVB"
-  s.date    = GVB.date    rescue Time.now.strftime("%Y-%m-%d")
+  s.version = "v0.2.5"
 
   s.platform = Gem::Platform::RUBY
 
@@ -29,7 +22,6 @@ Gem::Specification.new do |s|
 
   s.add_development_dependency 'bundler'
   s.add_development_dependency 'github-release'
-  s.add_development_dependency 'git-version-bump'
   s.add_development_dependency 'rake', "~> 12.0"
   s.add_development_dependency 'redcarpet'
   s.add_development_dependency 'rubocop'
