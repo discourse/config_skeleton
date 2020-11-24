@@ -188,6 +188,19 @@ class ConfigSkeleton < ServiceSkeleton
     end
 
     initialize_config_skeleton_metrics
+    initialize_trigger_pipe
+  end
+
+  # Expose the write pipe which can be written to to trigger a config
+  # regeneration with a forced reload; a similar mechanism is used for
+  # shutdown but in that case writes are managed internally.
+  #
+  # Usage: config.reload_trigger.write(".") . It does not matter what
+  # is written, we are only detecting that something was written.
+  #
+  # @return [IO]
+  def reload_trigger
+    @trigger_regen_w
   end
 
   # Set the config generator running.
@@ -209,7 +222,11 @@ class ConfigSkeleton < ServiceSkeleton
     @terminate_r, @terminate_w = IO.pipe
 
     loop do
-      if ios = IO.select([notifier.to_io, @terminate_r], [], [], sleep_duration.tap { |d| logger.debug(logloc) { "Sleeping for #{d} seconds" } })
+      if ios = IO.select(
+          [notifier.to_io, @terminate_r, @trigger_regen_r],
+          [], [],
+          sleep_duration.tap { |d| logger.debug(logloc) { "Sleeping for #{d} seconds" } }
+      )
         if ios.first.include?(notifier.to_io)
           logger.debug(logloc) { "inotify triggered" }
           notifier.process
@@ -217,6 +234,10 @@ class ConfigSkeleton < ServiceSkeleton
         elsif ios.first.include?(@terminate_r)
           logger.debug(logloc) { "triggered by termination pipe" }
           break
+        elsif ios.first.include?(@trigger_regen_r)
+          logger.debug(logloc) { "triggered by regen pipe" }
+          regenerate_config(force_reload: true)
+          initialize_trigger_pipe
         else
           logger.error(logloc) { "Mysterious return from select: #{ios.inspect}" }
         end
@@ -268,6 +289,24 @@ class ConfigSkeleton < ServiceSkeleton
   end
 
   private
+
+  # Sets up the read/write IO pipe for the reload trigger.
+  # If the pipe already exists, close it and create a new
+  # one, otherwise IO.select triggers instantly after the
+  # first write, which will lead to a huge amount of config
+  # regens.
+  #
+  # @return [void]
+  #
+  def initialize_trigger_pipe
+    if @trigger_regen_r
+      @trigger_regen_r.close
+    end
+    if @trigger_regen_w
+      @trigger_regen_w.close
+    end
+    @trigger_regen_r, @trigger_regen_w = IO.pipe
+  end
 
   # Register metrics in the ServiceSkeleton metrics registry
   #
