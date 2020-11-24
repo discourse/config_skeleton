@@ -246,11 +246,13 @@ class ConfigSkeleton < ServiceSkeleton
           logger.debug(logloc) { "triggered by termination pipe" }
           break
         elsif ios.first.include?(@trigger_regen_r)
-          # check if anything was written, to exclude empty strings
-          if @trigger_regen_r.read_nonblock(1)
-            logger.debug(logloc) { "triggered by regen pipe" }
-            regenerate_config(force_reload: true)
-          end
+          # we want to wait until everything in the backlog is read
+          # before proceeding so we don't run out of buffer memory
+          # for the pipe
+          while @trigger_regen_r.read_nonblock(20, nil, exception: false) != :wait_readable; end
+
+          logger.debug(logloc) { "triggered by regen pipe" }
+          regenerate_config(force_reload: true)
         else
           logger.error(logloc) { "Mysterious return from select: #{ios.inspect}" }
         end
