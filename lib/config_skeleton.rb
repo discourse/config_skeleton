@@ -196,11 +196,12 @@ class ConfigSkeleton < ServiceSkeleton
 
     hook_signal(:HUP) do
       logger.info("SIGHUP") { "received SIGHUP, triggering config regeneration" }
-      regenerate_config(force_reload: true)
+      @trigger_regen_w << "."
     end
 
     initialize_config_skeleton_metrics
     @trigger_regen_r, @trigger_regen_w = IO.pipe
+    @terminate_r, @terminate_w = IO.pipe
   end
 
   # Expose the write pipe which can be written to to trigger a config
@@ -229,8 +230,6 @@ class ConfigSkeleton < ServiceSkeleton
     watch(*self.class.watches)
 
     logger.debug(logloc) { "notifier fd is #{notifier.to_io.inspect}" }
-
-    @terminate_r, @terminate_w = IO.pipe
 
     loop do
       if ios = IO.select(

@@ -4,5 +4,6 @@
 /.yardoc
 /coverage
 /.bundle
+/cfg.txt
 
 .rubocop-https---raw-githubusercontent-com-discourse-discourse-master--rubocop-yml
