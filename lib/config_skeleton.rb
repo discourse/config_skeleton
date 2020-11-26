@@ -196,7 +196,7 @@ class ConfigSkeleton < ServiceSkeleton
 
     hook_signal(:HUP) do
       logger.info("SIGHUP") { "received SIGHUP, triggering config regeneration" }
-      regenerate_config(force_reload: true)
+      @trigger_regen_w << "."
     end
 
     initialize_config_skeleton_metrics
