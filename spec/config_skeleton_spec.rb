@@ -95,14 +95,10 @@ RSpec.describe ConfigSkeleton do
     expect(config_before_hup).not_to eq(config_after_hup)
   end
 
-  def wait_until
-    Timeout::timeout(2) do
-      loop do
-        condition = yield
-        if condition
-          break
-        end
-      end
+  def wait_until(timeout = 2, &blk)
+    till = Time.now + (timeout.to_f / 1000)
+    while Time.now < till && !blk.call
+      sleep 0.001
     end
   end
 end
