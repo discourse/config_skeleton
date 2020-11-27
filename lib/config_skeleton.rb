@@ -23,7 +23,8 @@ require 'tempfile'
 #
 # 1. Implement service-specific config generation and reloading code, by
 #    overriding the private methods #config_file, #config_data, and #reload_server
-#    (and also potentially #config_ok? and #sleep_duration).
+#    (and also potentially #config_ok?, #sleep_duration, #before_regenerate_config, and
+#    #after_regenerate_config).
 #    See the documentation for those methods for what they need to do.
 #
 # 1. Setup any file watchers you want with .watch and #watch.
@@ -362,6 +363,20 @@ class ConfigSkeleton < ServiceSkeleton
     raise NotImplementedError, "config_data must be implemented in subclass."
   end
 
+  # Run code before the config is regenerated and the config_file
+  # is written.
+  #
+  # @note this can optionally be implemented by subclasses.
+  #
+  def before_regenerate_config(force_reload); end
+
+  # Run code after the config is regenerated and if the regeneration
+  # was forced the new config has been cycled in.
+  #
+  # @note this can optionally be implemented by subclasses.
+  #
+  def after_regenerate_config(force_reload); end
+
   # Verify that the currently running config is acceptable.
   #
   # In the event that a generated config is "bad", it may be possible to detect
@@ -443,6 +458,8 @@ class ConfigSkeleton < ServiceSkeleton
   # @return [void]
   #
   def regenerate_config(force_reload: false)
+    before_regenerate_config(force_reload)
+
     logger.debug(logloc) { "force? #{force_reload.inspect}" }
     tmpfile = Tempfile.new(service_name, File.dirname(config_file))
     logger.debug(logloc) { "Tempfile is #{tmpfile.path}" }
@@ -466,6 +483,8 @@ class ConfigSkeleton < ServiceSkeleton
         cycle_config(tmpfile.path)
       end
     end
+
+    after_regenerate_config(force_reload)
   ensure
     metrics.last_change_timestamp.set({}, File.stat(config_file).mtime.to_f)
     tmpfile.close rescue nil
