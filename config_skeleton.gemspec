@@ -1,14 +1,14 @@
 Gem::Specification.new do |s|
   s.name = "config_skeleton"
 
-  s.version = "0.3.1"
+  s.version = "0.4.0"
 
   s.platform = Gem::Platform::RUBY
 
   s.summary  = "Dynamically generate configs and reload servers"
 
-  s.authors  = ["Matt Palmer"]
-  s.email    = ["matt.palmer@discourse.org"]
+  s.authors  = ["Matt Palmer", "Discourse Team"]
+  s.email    = ["matt.palmer@discourse.org", "team@discourse.org"]
   s.homepage = "https://github.com/discourse/config_skeleton"
 
   s.files = `git ls-files -z`.split("\0").reject { |f| f =~ /^(G|spec|Rakefile)/ }
