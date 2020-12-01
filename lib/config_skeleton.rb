@@ -371,7 +371,7 @@ class ConfigSkeleton < ServiceSkeleton
   #
   # @note this can optionally be implemented by subclasses.
   #
-  def before_regenerate_config(force_reload:, existing_config_hash:); end
+  def before_regenerate_config(force_reload:, existing_config_hash:, existing_config_data:); end
 
   # Run code after the config is regenerated and potentially a new file is written.
   #
@@ -465,8 +465,13 @@ class ConfigSkeleton < ServiceSkeleton
   # @return [void]
   #
   def regenerate_config(force_reload: false)
-    existing_config_hash = Digest::MD5.hexdigest(File.read(config_file))
-    before_regenerate_config(force_reload: force_reload, existing_config_hash: existing_config_hash)
+    data = File.read(config_file)
+    existing_config_hash = Digest::MD5.hexdigest(data)
+    before_regenerate_config(
+      force_reload: force_reload,
+      existing_config_hash: existing_config_hash,
+      existing_config_data: data
+    )
 
     logger.debug(logloc) { "force? #{force_reload.inspect}" }
     tmpfile = Tempfile.new(service_name, File.dirname(config_file))

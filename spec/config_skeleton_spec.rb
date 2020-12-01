@@ -96,8 +96,8 @@ RSpec.describe ConfigSkeleton do
   end
 
   it "calls before_regenerate_config with the appropriate arguments" do
-    expect(subject).to receive(:before_regenerate_config).with(force_reload: false, existing_config_hash: kind_of(String)).at_least(:once)
-    expect(subject).to receive(:before_regenerate_config).with(force_reload: true, existing_config_hash: kind_of(String)).at_least(:once)
+    expect(subject).to receive(:before_regenerate_config).with(force_reload: false, existing_config_hash: kind_of(String), existing_config_data: kind_of(String)).at_least(:once)
+    expect(subject).to receive(:before_regenerate_config).with(force_reload: true, existing_config_hash: kind_of(String), existing_config_data: kind_of(String)).at_least(:once)
     force_regen_with_notifier
     sleep 1
   end
