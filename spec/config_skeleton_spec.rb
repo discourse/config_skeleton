@@ -95,6 +95,31 @@ RSpec.describe ConfigSkeleton do
     expect(config_before_hup).not_to eq(config_after_hup)
   end
 
+  it "calls before_regenerate_config with the appropriate arguments" do
+    expect(subject).to receive(:before_regenerate_config).with(force_reload: false, existing_config_hash: kind_of(String)).at_least(:once)
+    expect(subject).to receive(:before_regenerate_config).with(force_reload: true, existing_config_hash: kind_of(String)).at_least(:once)
+    force_regen_with_notifier
+    sleep 1
+  end
+
+  it "calls after_regenerate_config with the appropriate arguments" do
+    expect(subject).to receive(:after_regenerate_config).with(force_reload: false, config_was_different: true, config_was_cycled: true, new_config_hash: kind_of(String)).at_least(:once)
+    expect(subject).to receive(:after_regenerate_config).with(force_reload: true, config_was_different: true, config_was_cycled: true, new_config_hash: kind_of(String)).at_least(:once)
+    force_regen_with_notifier
+    sleep 1
+  end
+
+  def force_regen_with_notifier
+    notif = subject.regen_notifier
+    Thread.new { subject.run }
+
+    wait_until { File.read(cfg_file_path) != "" }
+    config_before_trigger = File.read(cfg_file_path)
+    notif.trigger_regen
+    config_after_trigger = nil
+    wait_until { config_after_trigger = File.read(cfg_file_path) != config_before_trigger }
+  end
+
   def wait_until(timeout = 2000, &blk)
     till = Time.now + (timeout.to_f / 1000)
     while Time.now < till && !blk.call

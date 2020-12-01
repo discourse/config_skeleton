@@ -5,6 +5,7 @@ require 'logger'
 require 'rb-inotify'
 require 'service_skeleton'
 require 'tempfile'
+require 'digest/md5'
 
 # Framework for creating config generation systems.
 #
@@ -23,8 +24,7 @@ require 'tempfile'
 #
 # 1. Implement service-specific config generation and reloading code, by
 #    overriding the private methods #config_file, #config_data, and #reload_server
-#    (and also potentially #config_ok?, #sleep_duration, #before_regenerate_config, and
-#    #after_regenerate_config).
+#    (and also potentially #config_ok?, #sleep_duration, #before_regenerate_config, and #after_regenerate_config).
 #    See the documentation for those methods for what they need to do.
 #
 # 1. Setup any file watchers you want with .watch and #watch.
@@ -366,16 +366,23 @@ class ConfigSkeleton < ServiceSkeleton
   # Run code before the config is regenerated and the config_file
   # is written.
   #
+  # @param force_reload [Boolean] Whether the regenerate_config was called with force_reload
+  # @param existing_config_hash [String] MD5 hash of the config file before regeneration.
+  #
   # @note this can optionally be implemented by subclasses.
   #
-  def before_regenerate_config(force_reload); end
+  def before_regenerate_config(force_reload:, existing_config_hash:); end
 
-  # Run code after the config is regenerated and if the regeneration
-  # was forced the new config has been cycled in.
+  # Run code after the config is regenerated and potentially a new file is written.
+  #
+  # @param force_reload [Boolean] Whether the regenerate_config was called with force_reload
+  # @param config_was_different [Boolean] Whether the diff of the old and new config was different.
+  # @param config_was_cycled [Boolean] Whether a new config file was cycled in.
+  # @param new_config_hash [String] MD5 hash of the new config file after write.
   #
   # @note this can optionally be implemented by subclasses.
   #
-  def after_regenerate_config(force_reload); end
+  def after_regenerate_config(force_reload:, config_was_different:, config_was_cycled:, new_config_hash:); end
 
   # Verify that the currently running config is acceptable.
   #
@@ -458,7 +465,8 @@ class ConfigSkeleton < ServiceSkeleton
   # @return [void]
   #
   def regenerate_config(force_reload: false)
-    before_regenerate_config(force_reload)
+    existing_config_hash = Digest::MD5.hexdigest(File.read(config_file))
+    before_regenerate_config(force_reload: force_reload, existing_config_hash: existing_config_hash)
 
     logger.debug(logloc) { "force? #{force_reload.inspect}" }
     tmpfile = Tempfile.new(service_name, File.dirname(config_file))
@@ -466,25 +474,38 @@ class ConfigSkeleton < ServiceSkeleton
     unless (new_config = instrumented_config_data).nil?
       File.write(tmpfile.path, new_config)
       tmpfile.close
-      logger.debug(logloc) { require 'digest/md5'; "Existing config hash: #{Digest::MD5.hexdigest(File.read(config_file))}, new config hash: #{Digest::MD5.hexdigest(File.read(tmpfile.path))}" }
+
+      new_config_hash = Digest::MD5.hexdigest(File.read(tmpfile.path))
+      logger.debug(logloc) do
+        "Existing config hash: #{existing_config_hash}, new config hash: #{new_config_hash}"
+      end
 
       match_perms(config_file, tmpfile.path)
 
-      diff = Diffy::Diff.new(config_file, tmpfile.path, source: 'files', context: 3, include_diff_info: true)
-      if diff.to_s != ""
-        logger.info(logloc) { "Config has changed.  Diff:\n#{diff.to_s}" }
+      diff = Diffy::Diff.new(config_file, tmpfile.path, source: 'files', context: 3, include_diff_info: true).to_s
+      config_was_different = diff != ""
+
+      if config_was_different
+        logger.info(logloc) { "Config has changed.  Diff:\n#{diff}" }
       end
 
       if force_reload
         logger.debug(logloc) { "Forcing config reload because force_reload == true" }
       end
 
-      if force_reload || diff.to_s != ""
+      config_was_cycled = false
+      if force_reload || config_was_different
         cycle_config(tmpfile.path)
+        config_was_cycled = true
       end
     end
 
-    after_regenerate_config(force_reload)
+    after_regenerate_config(
+      force_reload: force_reload,
+      config_was_different: config_was_different,
+      config_was_cycled: config_was_cycled,
+      new_config_hash: new_config_hash
+    )
   ensure
     metrics.last_change_timestamp.set({}, File.stat(config_file).mtime.to_f)
     tmpfile.close rescue nil
