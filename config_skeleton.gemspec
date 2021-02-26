@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name = "config_skeleton"
 
-  s.version = "0.4.1"
+  s.version = "1.0.0"
 
   s.platform = Gem::Platform::RUBY
 
@@ -16,9 +16,8 @@ Gem::Specification.new do |s|
   s.required_ruby_version = ">= 2.3.0"
 
   s.add_runtime_dependency 'diffy', '~> 3.0'
-  s.add_runtime_dependency 'frankenstein', '~> 1.0'
   s.add_runtime_dependency 'rb-inotify', '~> 0.9'
-  s.add_runtime_dependency 'service_skeleton', '> 0.a'
+  s.add_runtime_dependency 'service_skeleton', "~> 1.0"
 
   s.add_development_dependency 'bundler'
   s.add_development_dependency 'github-release'
