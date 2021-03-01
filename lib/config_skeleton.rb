@@ -7,7 +7,7 @@ require 'tempfile'
 require 'digest/md5'
 
 begin
-  require 'rb-inotify' unless ENV["DISABLE_INOTIFY"] == "1"
+  require 'rb-inotify' unless ENV["DISABLE_INOTIFY"]
 rescue FFI::NotFoundError => e
   STDERR.puts "ERROR: Unable to initialize rb-inotify. To disable, set DISABLE_INOTIFY=1"
   raise
