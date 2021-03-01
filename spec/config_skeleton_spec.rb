@@ -49,7 +49,7 @@ RSpec.describe ConfigSkeleton do
 
   let(:runner) { ServiceSkeleton::Runner.new(MyConfig, env) }
   let(:ultravisor) { runner.instance_variable_get(:@ultravisor) }
-  
+
   def instance
     ultravisor[:my_config].unsafe_instance
   end
@@ -72,7 +72,7 @@ RSpec.describe ConfigSkeleton do
     thread = Thread.new { runner.run }
     wait_until { File.read(cfg_file_path) != "" }
     config_before_file_change = File.read(cfg_file_path)
-    File.write(tmp_watch_file, "some data");
+    File.write(tmp_watch_file, "some data")
     config_after_file_change = nil
     wait_until { config_after_file_change = File.read(cfg_file_path) != config_before_file_change }
     expect(config_before_file_change).not_to eq(config_after_file_change)
@@ -127,8 +127,8 @@ RSpec.describe ConfigSkeleton do
     wait_until { instance.after_regenerate_data&.size == 2 }
 
     expect(instance.before_regenerate_data).to include(
-      { force_reload: false, existing_config_hash: kind_of(String), existing_config_data: kind_of(String)},
-      { force_reload: true, existing_config_hash: kind_of(String), existing_config_data: kind_of(String)}
+      { force_reload: false, existing_config_hash: kind_of(String), existing_config_data: kind_of(String) },
+      { force_reload: true, existing_config_hash: kind_of(String), existing_config_data: kind_of(String) }
     )
 
     expect(instance.after_regenerate_data).to include(
