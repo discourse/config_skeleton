@@ -41,7 +41,7 @@ end
 #          # Implement all the necessary methods
 #        end
 #
-#        ServiceSkeleton::Runner.new(FilebeatConfig, ENV).run if __FILE__ == $0
+#        ServiceSkeleton::Runner.new(MyConfigGenerator, ENV).run if __FILE__ == $0
 #
 # 1. Sit back and relax.
 #
