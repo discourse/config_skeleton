@@ -2,10 +2,16 @@ require 'diffy'
 require 'fileutils'
 require 'frankenstein'
 require 'logger'
-require 'rb-inotify'
 require 'service_skeleton'
 require 'tempfile'
 require 'digest/md5'
+
+begin
+  require 'rb-inotify' unless ENV["DISABLE_INOTIFY"]
+rescue FFI::NotFoundError => e
+  STDERR.puts "ERROR: Unable to initialize rb-inotify. To disable, set DISABLE_INOTIFY=1"
+  raise
+end
 
 # Framework for creating config generation systems.
 #
@@ -29,14 +35,13 @@ require 'digest/md5'
 #
 # 1. Setup any file watchers you want with .watch and #watch.
 #
-# 1. Instantiate your new class, passing in an environment hash, and then call
-#    #start.  Something like this should do the trick:
+# 1. Use the ServiceSkeleton Runner to start the service. Something like this should do the trick:
 #
 #        class MyConfigGenerator < ConfigSkeleton
 #          # Implement all the necessary methods
 #        end
 #
-#        MyConfigGenerator.new(ENV).start if __FILE__ == $0
+#        ServiceSkeleton::Runner.new(FilebeatConfig, ENV).run if __FILE__ == $0
 #
 # 1. Sit back and relax.
 #
@@ -136,7 +141,8 @@ require 'digest/md5'
 # method, passing one or more strings containing the full path to files or
 # directories to watch.
 #
-class ConfigSkeleton < ServiceSkeleton
+class ConfigSkeleton
+  include ServiceSkeleton
   # All ConfigSkeleton-related errors will be subclasses of this.
   class Error < StandardError; end
 
@@ -152,6 +158,19 @@ class ConfigSkeleton < ServiceSkeleton
 
     def trigger_regen
       @io_write << "."
+    end
+  end
+
+  def self.inherited(klass)
+    klass.gauge :"#{klass.service_name}_last_generation_timestamp", docstring: "When the last config generation run was made"
+    klass.gauge :"#{klass.service_name}_last_change_timestamp", docstring: "When the config file was last written to"
+    klass.counter :"#{klass.service_name}_reload_total", docstring: "How many times we've asked the server to reload", labels: [:status]
+    klass.counter :"#{klass.service_name}_signals_total", docstring: "How many signals have been received (and handled)"
+    klass.gauge :"#{klass.service_name}_config_ok", docstring: "Whether the last config change was accepted by the server"
+
+    klass.hook_signal("HUP") do
+      logger.info("SIGHUP") { "received SIGHUP, triggering config regeneration" }
+      @trigger_regen_w << "."
     end
   end
 
@@ -186,20 +205,8 @@ class ConfigSkeleton < ServiceSkeleton
     @watches || []
   end
 
-  # Create a new config generator.
-  #
-  # @param env [Hash<String, String>] the environment in which this config
-  #   generator runs.  Typically you'll just pass `ENV` in here, but you can
-  #   pass in any hash you like, for testing purposes.
-  #
-  def initialize(env)
+  def initialize(*_)
     super
-
-    hook_signal(:HUP) do
-      logger.info("SIGHUP") { "received SIGHUP, triggering config regeneration" }
-      @trigger_regen_w << "."
-    end
-
     initialize_config_skeleton_metrics
     @trigger_regen_r, @trigger_regen_w = IO.pipe
     @terminate_r, @terminate_w = IO.pipe
@@ -294,6 +301,7 @@ class ConfigSkeleton < ServiceSkeleton
   # @see .watch for watching files and directories whose path never changes.
   #
   def watch(*files)
+    return if ENV["DISABLE_INOTIFY"]
     files.each do |f|
       if File.directory?(f)
         notifier.watch(f, :recursive, :create, :modify, :delete, :move) { |ev| logger.info("#{logloc} watcher") { "detected #{ev.flags.join(", ")} on #{ev.watcher.path}/#{ev.name}; regenerating config" } }
@@ -305,22 +313,11 @@ class ConfigSkeleton < ServiceSkeleton
 
   private
 
-  # Register metrics in the ServiceSkeleton metrics registry
-  #
-  # @return [void]
-  #
   def initialize_config_skeleton_metrics
-    @config_generation = Frankenstein::Request.new("#{service_name}_generation", outgoing: false, description: "config generation", registry: metrics)
-
-    metrics.gauge(:"#{service_name}_last_generation_timestamp", "When the last config generation run was made")
-    metrics.gauge(:"#{service_name}_last_change_timestamp", "When the config file was last written to")
-    metrics.counter(:"#{service_name}_reload_total", "How many times we've asked the server to reload")
-    metrics.counter(:"#{service_name}_signals_total", "How many signals have been received (and handled)")
-    metrics.gauge(:"#{service_name}_config_ok", "Whether the last config change was accepted by the server")
-
-    metrics.last_generation_timestamp.set({}, 0)
-    metrics.last_change_timestamp.set({}, 0)
-    metrics.config_ok.set({}, 0)
+    @config_generation = Frankenstein::Request.new("#{self.class.service_name}_generation", outgoing: false, description: "config generation", registry: metrics)
+    metrics.last_generation_timestamp.set(0)
+    metrics.last_change_timestamp.set(0)
+    metrics.config_ok.set(0)
   end
 
   # Write out a config file if one doesn't exist, or do an initial regen run
@@ -335,7 +332,7 @@ class ConfigSkeleton < ServiceSkeleton
     else
       logger.info(logloc) { "No existing config file #{config_file} found; writing one" }
       File.write(config_file, instrumented_config_data)
-      metrics.last_change_timestamp.set({}, Time.now.to_f)
+      metrics.last_change_timestamp.set(Time.now.to_f)
     end
   end
 
@@ -423,7 +420,7 @@ class ConfigSkeleton < ServiceSkeleton
   #
   def instrumented_config_data
     begin
-      @config_generation.measure { config_data.tap { metrics.last_generation_timestamp.set({}, Time.now.to_f) } }
+      @config_generation.measure { config_data.tap { metrics.last_generation_timestamp.set(Time.now.to_f) } }
     rescue => ex
       log_exception(ex, logloc) { "Call to config_data raised exception" }
       nil
@@ -453,6 +450,9 @@ class ConfigSkeleton < ServiceSkeleton
   #
   def notifier
     @notifier ||= INotify::Notifier.new
+  rescue NameError
+    raise if !ENV["DISABLE_INOTIFY"]
+    @notifier ||= Struct.new(:to_io).new(IO.pipe[1]) # Stub for macOS development
   end
 
   # Do the hard yards of actually regenerating the config and performing the reload.
@@ -474,7 +474,7 @@ class ConfigSkeleton < ServiceSkeleton
     )
 
     logger.debug(logloc) { "force? #{force_reload.inspect}" }
-    tmpfile = Tempfile.new(service_name, File.dirname(config_file))
+    tmpfile = Tempfile.new(self.class.service_name, File.dirname(config_file))
     logger.debug(logloc) { "Tempfile is #{tmpfile.path}" }
     unless (new_config = instrumented_config_data).nil?
       File.write(tmpfile.path, new_config)
@@ -512,7 +512,7 @@ class ConfigSkeleton < ServiceSkeleton
       new_config_hash: new_config_hash
     )
   ensure
-    metrics.last_change_timestamp.set({}, File.stat(config_file).mtime.to_f)
+    metrics.last_change_timestamp.set(File.stat(config_file).mtime.to_f)
     tmpfile.close rescue nil
     tmpfile.unlink rescue nil
   end
@@ -562,7 +562,7 @@ class ConfigSkeleton < ServiceSkeleton
         logger.debug(logloc) { "Restored previous config file" }
         File.rename(old_copy, config_file)
       end
-      metrics.reload_total.increment(status: "failure")
+      metrics.reload_total.increment(labels: { status: "failure" })
 
       return
     end
@@ -570,21 +570,21 @@ class ConfigSkeleton < ServiceSkeleton
     logger.debug(logloc) { "Server reloaded successfully" }
 
     if config_ok?
-      metrics.config_ok.set({}, 1)
+      metrics.config_ok.set(1)
       logger.debug(logloc) { "Configuration successfully updated." }
-      metrics.reload_total.increment(status: "success")
-      metrics.last_change_timestamp.set({}, Time.now.to_f)
+      metrics.reload_total.increment(labels: { status: "success" })
+      metrics.last_change_timestamp.set(Time.now.to_f)
     else
-      metrics.config_ok.set({}, 0)
+      metrics.config_ok.set(0)
       if config_was_ok
         logger.warn(logloc) { "New config file failed config_ok? test; rolling back to previous known-good config" }
         File.rename(old_copy, config_file)
         reload_server
-        metrics.reload_total.increment(status: "bad-config")
+        metrics.reload_total.increment(labels: { status: "bad-config" })
       else
         logger.warn(logloc) { "New config file failed config_ok? test; leaving new config in place because old config is broken too" }
-        metrics.reload_total.increment(status: "everything-is-awful")
-        metrics.last_change_timestamp.set({}, Time.now.to_f)
+        metrics.reload_total.increment(labels: { status: "everything-is-awful" })
+        metrics.last_change_timestamp.set(Time.now.to_f)
       end
     end
   ensure
