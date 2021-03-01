@@ -35,14 +35,13 @@ end
 #
 # 1. Setup any file watchers you want with .watch and #watch.
 #
-# 1. Instantiate your new class, passing in an environment hash, and then call
-#    #start.  Something like this should do the trick:
+# 1. Use the ServiceSkeleton Runner to start the service. Something like this should do the trick:
 #
 #        class MyConfigGenerator < ConfigSkeleton
 #          # Implement all the necessary methods
 #        end
 #
-#        MyConfigGenerator.new(ENV).start if __FILE__ == $0
+#        ServiceSkeleton::Runner.new(FilebeatConfig, ENV).run if __FILE__ == $0
 #
 # 1. Sit back and relax.
 #
