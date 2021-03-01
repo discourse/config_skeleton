@@ -16,7 +16,6 @@ Gem::Specification.new do |s|
   s.required_ruby_version = ">= 2.3.0"
 
   s.add_runtime_dependency 'diffy', '~> 3.0'
-  s.add_runtime_dependency 'frankenstein', '~> 1.0'
   s.add_runtime_dependency 'rb-inotify', '~> 0.9'
   s.add_runtime_dependency 'service_skeleton', "~> 1.0"
 
