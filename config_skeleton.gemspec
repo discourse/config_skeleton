@@ -19,7 +19,7 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency 'webrick'
 
   s.add_development_dependency 'bundler'
-  s.add_development_dependency 'rake', "~> 12.0"
+  s.add_development_dependency 'rake', "~> 13.0"
   s.add_development_dependency 'redcarpet'
   s.add_development_dependency 'rubocop-discourse', '~> 2.4.1'
   s.add_development_dependency 'yard'
