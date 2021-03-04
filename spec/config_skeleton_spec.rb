@@ -69,6 +69,8 @@ RSpec.describe ConfigSkeleton do
   end
 
   it "watches for file changes and regenerates config on change" do
+    skip("No inotify, no watching for file changes") if ENV["DISABLE_INOTIFY"]
+
     thread = Thread.new { runner.run }
     wait_until { File.read(cfg_file_path) != "" }
     config_before_file_change = File.read(cfg_file_path)
