@@ -17,7 +17,7 @@ RSpec.describe ConfigSkeleton do
     string :MY_CONFIG_FILE
     string :MY_CONFIG_WATCH_FILE
 
-    def initialize(*_)
+    def initialize(*_, metrics:, config:)
       super
       watch config.watch_file
     end
