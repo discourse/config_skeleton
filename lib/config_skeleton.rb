@@ -240,11 +240,16 @@ class ConfigSkeleton
     logger.debug(logloc) { "notifier fd is #{notifier.to_io.inspect}" }
 
     loop do
-      if ios = IO.select(
-          [notifier.to_io, @terminate_r, @trigger_regen_r],
-          [], [],
-          sleep_duration.tap { |d| logger.debug(logloc) { "Sleeping for #{d} seconds" } }
-      )
+      if cooldown_duration > 0
+        logger.debug(logloc) { "Sleeping for #{cooldown_duration} seconds (cooldown)" }
+        IO.select([@terminate_r], [], [], cooldown_duration)
+      end
+
+      timeout = sleep_duration - cooldown_duration
+      logger.debug(logloc) { "Sleeping for #{timeout} seconds unless interrupted" }
+      ios = IO.select([notifier.to_io, @terminate_r, @trigger_regen_r], [], [], timeout)
+
+      if ios
         if ios.first.include?(notifier.to_io)
           logger.debug(logloc) { "inotify triggered" }
           notifier.process
@@ -442,6 +447,21 @@ class ConfigSkeleton
   #
   def sleep_duration
     60
+  end
+
+  # How long to ignore signals/notifications after a config regeneration
+  #
+  # Hammering a downstream service with reload requests is often a bad idea.
+  # This method exists to allow subclasses to define a 'cooldown' duration.
+  # After each config regeneration, the config generator will sleep for this
+  # duration, regardless of any CONT signals or inotify events. Those events
+  # will be queued up, and processed at the end of the cooldown.
+  #
+  # @return [Integer] the number of seconds to 'cooldown' for.  This *must* be
+  #   greater than zero, and less than sleep_duration
+  #
+  def cooldown_duration
+    5
   end
 
   # The instance of INotify::Notifier that is holding our file watches.

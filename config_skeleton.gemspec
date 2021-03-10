@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name = "config_skeleton"
 
-  s.version = "1.0.0"
+  s.version = "1.1.0"
 
   s.platform = Gem::Platform::RUBY
 
