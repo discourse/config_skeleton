@@ -212,6 +212,10 @@ class ConfigSkeleton
     initialize_config_skeleton_metrics
     @trigger_regen_r, @trigger_regen_w = IO.pipe
     @terminate_r, @terminate_w = IO.pipe
+
+    raise "cooldown_duration invalid" if cooldown_duration < 0
+    raise "sleep_duration invalid" if sleep_duration < 0
+    raise "sleep_duration must not be less than cooldown_duration" if sleep_duration < cooldown_duration
   end
 
   # Expose the write pipe which can be written to to trigger a config
@@ -458,6 +462,10 @@ class ConfigSkeleton
   # After each config regeneration, the config generator will sleep for this
   # duration, regardless of any CONT signals or inotify events. Those events
   # will be queued up, and processed at the end of the cooldown.
+  #
+  # The cooldown_duration is counted as part of the sleep_duration. So for
+  # the default values of 60 and 5, the service will cooldown for 5s, then wait
+  # for 55s.
   #
   # @return [Integer] the number of seconds to 'cooldown' for.  This *must* be
   #   greater than zero, and less than sleep_duration
