@@ -34,3 +34,6 @@ end
 task :doc_stats do
   system("yard stats --list-undoc")
 end
+
+require 'rspec/core/rake_task'
+RSpec::Core::RakeTask.new(:test)

@@ -207,7 +207,7 @@ class ConfigSkeleton
     @watches || []
   end
 
-  def initialize(*_)
+  def initialize(*_, metrics:, config:)
     super
     initialize_config_skeleton_metrics
     @trigger_regen_r, @trigger_regen_w = IO.pipe
