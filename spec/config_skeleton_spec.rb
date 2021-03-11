@@ -34,6 +34,10 @@ RSpec.describe ConfigSkeleton do
       true
     end
 
+    def cooldown_duration
+      0.01
+    end
+
     attr_accessor :before_regenerate_data, :after_regenerate_data
 
     def before_regenerate_config(**kwargs)
