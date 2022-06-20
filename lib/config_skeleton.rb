@@ -164,11 +164,12 @@ class ConfigSkeleton
   end
 
   def self.inherited(klass)
+    klass.gauge :"#{klass.service_name}_config_ok", docstring: "Whether the last config change was accepted by the server"
+    klass.gauge :"#{klass.service_name}_generation_ok", docstring: "Whether the last config generation completed without error"
     klass.gauge :"#{klass.service_name}_last_generation_timestamp", docstring: "When the last config generation run was made"
     klass.gauge :"#{klass.service_name}_last_change_timestamp", docstring: "When the config file was last written to"
     klass.counter :"#{klass.service_name}_reload_total", docstring: "How many times we've asked the server to reload", labels: [:status]
     klass.counter :"#{klass.service_name}_signals_total", docstring: "How many signals have been received (and handled)"
-    klass.gauge :"#{klass.service_name}_config_ok", docstring: "Whether the last config change was accepted by the server"
 
     klass.hook_signal("HUP") do
       logger.info("SIGHUP") { "received SIGHUP, triggering config regeneration" }
@@ -329,6 +330,7 @@ class ConfigSkeleton
     metrics.last_generation_timestamp.set(0)
     metrics.last_change_timestamp.set(0)
     metrics.config_ok.set(0)
+    metrics.generation_ok.set(0)
   end
 
   # Write out a config file if one doesn't exist, or do an initial regen run
@@ -431,9 +433,15 @@ class ConfigSkeleton
   #
   def instrumented_config_data
     begin
-      @config_generation.measure { config_data.tap { metrics.last_generation_timestamp.set(Time.now.to_f) } }
+      @config_generation.measure do
+        config_data.tap do
+          metrics.last_generation_timestamp.set(Time.now.to_f)
+          metrics.generation_ok.set(1)
+        end
+      end
     rescue => ex
       log_exception(ex, logloc) { "Call to config_data raised exception" }
+      metrics.generation_ok.set(0)
       nil
     end
   end
