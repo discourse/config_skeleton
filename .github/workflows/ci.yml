@@ -4,7 +4,6 @@ on:
   pull_request:
   push:
     branches:
-      - master
       - main
 
 jobs:
@@ -35,7 +34,7 @@ jobs:
         run: bundle exec rake test
 
   publish:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
 
