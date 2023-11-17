@@ -339,7 +339,7 @@ class ConfigSkeleton
   # @return [void]
   #
   def write_initial_config
-    if File.exists?(config_file)
+    if File.exist?(config_file)
       logger.info(logloc) { "Triggering a config regen on startup to ensure config is up-to-date" }
       regenerate_config
     else
