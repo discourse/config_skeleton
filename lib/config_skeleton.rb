@@ -145,6 +145,7 @@ end
 #
 class ConfigSkeleton
   include ServiceSkeleton
+
   # All ConfigSkeleton-related errors will be subclasses of this.
   class Error < StandardError; end
 
@@ -164,6 +165,8 @@ class ConfigSkeleton
   end
 
   def self.inherited(klass)
+    klass.boolean "#{klass.service_name.upcase}_CONFIG_ONESHOT".to_sym, default: false
+
     klass.gauge :"#{klass.service_name}_config_ok", docstring: "Whether the last config change was accepted by the server"
     klass.gauge :"#{klass.service_name}_generation_ok", docstring: "Whether the last config generation completed without error"
     klass.gauge :"#{klass.service_name}_last_generation_timestamp", docstring: "When the last config generation run was made"
@@ -241,6 +244,11 @@ class ConfigSkeleton
     logger.info(logloc) { "Commencing config management" }
 
     write_initial_config
+
+    if config.config_oneshot
+      logger.info(logloc) { "Oneshot run specified - exiting" }
+      Process.kill("TERM", $PID)
+    end
 
     watch(*self.class.watches)
 
