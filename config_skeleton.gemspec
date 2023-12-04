@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name = "config_skeleton"
-  s.version = "2.2.1"
+  s.version = "2.3.0"
 
   s.platform = Gem::Platform::RUBY
   s.summary  = "Dynamically generate configs and reload servers"
