@@ -24,6 +24,9 @@ presumably know what to do already.
 
 # Usage
 
+A single execution of configuration generation can be performed by specifying
+the `SERVICE_NAME_CONFIG_ONESHOT=true` environment variable.
+
 All of the documentation is provided in the [ConfigSkeleton class](https://rubydoc.info/gems/config_skeleton/ConfigSkeleton).
 
 
